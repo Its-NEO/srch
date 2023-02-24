@@ -33,9 +33,9 @@ pub struct Arguments {
     #[arg(short='i', long)]
     useignore: bool,
 
-    /// Give me the first n results
+    /// Display file information along with the path
     #[arg(short, long)]
-    count: Option<usize>
+    verbose: bool
 }
 
 fn main() -> Result<()> {
@@ -48,7 +48,6 @@ fn main() -> Result<()> {
     let stdout: Stdout = io::stdout();
     let mut buf_writer: BufWriter<Stdout> = io::BufWriter::new(stdout);
 
-    
     // Can only print either infile or non-infile
     if args.infile {
         tree.infile(args.depth, tree.path(), &args, &mut results);
@@ -58,7 +57,7 @@ fn main() -> Result<()> {
         tree.quick_fill(args.depth, tree.path(), &args, &mut results);
     }
 
-    results.colorize(&mut buf_writer)?;
+    results.colorize(&mut buf_writer, args.verbose)?;
     
     // so this is how long the program took to run :D
     let duration = instant.elapsed();

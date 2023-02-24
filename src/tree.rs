@@ -97,15 +97,20 @@ impl Tree {
             tree.path = entry_path.clone();
 
             if fs::metadata(&entry_path).is_ok() {
-                if fs::metadata(&entry_path).unwrap().is_dir() {
+                let metadata = fs::metadata(&entry_path).unwrap();
+                results.metadata.push(metadata.clone());
+                
+                if metadata.is_dir() {
                     results.add_foldercount();
                 } else {
                     results.add_filecount();
                 }
-            }
+            }                
 
             if entry_file.contains(&args.pattern) {
-                results.push(entry_path.clone());
+                results.pathlist.push(entry_path.clone());
+            } else if fs::metadata(&entry_path).is_ok() {
+                results.metadata.pop();
             }
 
             // go inside this entry directory(if), then rinse and repeat
@@ -120,34 +125,38 @@ impl Tree {
         // return if the path is a file or a syslink or let's say, is not a directory
         let metadata: Result<Metadata> = fs::metadata(&path);
         if metadata.is_err() { return; }
-        if metadata.unwrap().is_file() { 
+        if metadata.as_ref().unwrap().is_file() { 
             let mut file: File = match fs::File::open(&path) {Ok(x) => x, _ => return };
-            
+                
             // inspect the file to check if its a binary file >:( 
-                let mut buffer = [0; 1024];
-                match file.read(&mut buffer) {Ok(_) => {}, _ => return};
-                if content_inspector::inspect(&buffer[..]).is_binary() { return; }
+            let mut buffer = [0; 1024];
+            match file.read(&mut buffer) {Ok(_) => {}, _ => return};
+            if content_inspector::inspect(&buffer[..]).is_binary() { return; }
+            
+            // read the file to a string
+            let content: String = match fs::read_to_string(&path) {Ok(x) => x, _ => return };
+            
+            // does it even contain the pattern?
+            if !content.contains(&args.pattern) { return; }
+            
+            /* Here, the real magic happens:
+            *  - Lines are being counted and 
+            *  - Characters before the pattern in each line are being counted
+            */
+            for (linecount, result) in content.lines().enumerate() {
+                if !result.contains(&args.pattern) { continue; }
                 
-                // read the file to a string
-                let content: String = match fs::read_to_string(&path) {Ok(x) => x, _ => return };
-                
-                // does it even contain the pattern?
-                if !content.contains(&args.pattern) { return; }
-                
-                /* Here, the real magic happens:
-                *  - Lines are being counted and 
-                *  - Characters before the pattern in each line are being counted
-                */
-                for (linecount, result) in content.lines().enumerate() {
-                    if !result.contains(&args.pattern) { continue; }
-                    
-                    let splitted_result: Vec<&str> = result.split(&args.pattern).collect();
-                    let mut last = 0;
-                    for takeout in splitted_result.iter().take(splitted_result.len() - 1) {
-                        last += takeout.len();
-                        results.push(format!(
-                            "{}:{}:{}", path, last, linecount
+                let splitted_result: Vec<&str> = result.split(&args.pattern).collect();
+                let mut last = 0;
+                for takeout in splitted_result.iter().take(splitted_result.len() - 1) {
+                    last += takeout.len();
+                    results.pathlist.push(format!(
+                        "{}:{}:{}", path, last, linecount
                     ));
+
+                    results.metadata
+                        .push(metadata.as_ref()
+                        .unwrap().clone());
                 }
             }
             
@@ -182,7 +191,6 @@ impl Tree {
                 ignore.push(line.to_owned().trim_matches(separators).to_owned());
             }
         }
-
         
         for entry in entries {
             // the path to the entry
