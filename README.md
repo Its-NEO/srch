@@ -7,7 +7,9 @@ A crossplatform search utility written for you who craves simplicity.
 [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
 ### Download:
-```git clone https://github.com/Its-NEO/srch```
+```bash
+git clone https://github.com/Its-NEO/srch
+```
 
 ### Build it
 ```bash
