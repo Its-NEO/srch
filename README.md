@@ -8,7 +8,7 @@ A crossplatform search utility written for you who craves simplicity.
 
 ### Download:
 ```bash
-git clone https://github.com/Its-NEO/srch
+>> git clone https://github.com/Its-NEO/srch
 ```
 
 ### Build it
