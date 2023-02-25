@@ -8,18 +8,18 @@ A crossplatform search utility written for you who craves simplicity.
 
 ### Download:
 ```bash
->> git clone https://github.com/Its-NEO/srch
+git clone https://github.com/Its-NEO/srch
 ```
 
 ### Build it
 ```bash
->> cd srch
->> cargo build
+cd srch
+cargo build
 ```
 
 ### Add binary to your $PATH
 ```bash
->> cp target/debug/srch ~/.local/bin/
+cp target/debug/srch ~/.local/bin/
 ```
 
 
