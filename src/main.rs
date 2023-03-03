@@ -1,10 +1,10 @@
-mod tree;
 mod results;
+mod tree;
 
 use crate::results::Results;
 use clap::Parser;
+use std::io::{self, BufWriter, Result, Stdout, Write};
 use std::time::Instant;
-use std::io::{self, BufWriter, Stdout, Write, Result};
 use tree::Tree;
 
 #[derive(Parser)]
@@ -22,7 +22,7 @@ pub struct Arguments {
     depth: u8,
 
     /// Search through text-based file's contents
-    #[arg(short='f', long)]
+    #[arg(short = 'f', long, group = "internal")]
     infile: bool,
 
     /// Search through hidden folders
@@ -30,44 +30,46 @@ pub struct Arguments {
     all: bool,
 
     /// Use ignore files to ignore certain files and folders
-    #[arg(short='i', long)]
+    #[arg(short = 'i', long)]
     useignore: bool,
 
     /// Display file information along with the path
     #[arg(short, long)]
-    verbose: bool
+    verbose: bool,
+
+    /// Searches inside binary files (Skips large files) <Under construction>
+    #[arg(short, long, requires = "internal")]
+    binary: bool,
 }
 
 fn main() -> Result<()> {
     let instant = Instant::now();
 
     let args: Arguments = Arguments::parse();
-    let mut tree: Tree = Tree::new();
-    let mut results: Results = Results::new(&args.pattern);
-    
+    let mut tree: Tree = Tree::new(&".".to_string());
+    let mut results: Results = Results::new();
+
     let stdout: Stdout = io::stdout();
     let mut buf_writer: BufWriter<Stdout> = io::BufWriter::new(stdout);
 
-    // Can only print either infile or non-infile
     if args.infile {
-        tree.infile(args.depth, tree.path(), &args, &mut results);
-        
+        tree.search_infile(args.depth, tree.path(), &args, &mut results);
     } else {
-        // if count is provided, use it to filter it
         tree.quick_fill(args.depth, tree.path(), &args, &mut results);
     }
-
-    results.colorize(&mut buf_writer, args.verbose)?;
     
-    // so this is how long the program took to run :D
+    results.write(&mut buf_writer, args.verbose)?;
     let duration = instant.elapsed();
 
-    writeln!(buf_writer, "\nFound {} results.\nSearched through {} file(s) and {} folder(s) in {} ms.", 
-        results.pathlist.len(),
-        results.filecount, 
-        results.foldercount, 
-        duration.as_millis())?;
-    
+    writeln!(
+        buf_writer,
+        "\nFound {} results.\nSearched through {} file(s) and {} folder(s) in {} ms.",
+        format!("{}", results.get_entries().len()),
+        format!("{}", results.get_filecount()),
+        format!("{}", results.get_foldercount()),
+        format!("{}", duration.as_millis()),
+    )?;
+
     buf_writer.flush()?;
     Ok(())
 }

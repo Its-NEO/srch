@@ -1,217 +1,179 @@
-use std::io::{Result, Read};
-use std::fs::{self, Metadata, ReadDir, DirEntry, File};
-use crate::{Arguments, results::Results};
+use crate::results::Entry;
+use crate::{results::Results, Arguments};
+use std::fs::{self, DirEntry, Metadata};
+use std::io::Read;
 
-/// This represents a single node in the nodal representation of the file tree that the program implements.
-/// This is the <3 heart of the whole process.
-#[derive(Debug)]
 pub struct Tree {
     path: String,
-    children: Vec<Tree>
+    children: Vec<Tree>,
 }
 
 impl Tree {
-    /// This function will create a new generic tree.
-    pub fn new() -> Tree {
+    pub fn new(path: &String) -> Tree {
         Tree {
-            path: ".".to_string(),
-            children: Vec::new()
+            path: path.clone(),
+            children: Vec::new(),
         }
     }
 
-    /// Returns a path after cloning it.
     pub fn path(&self) -> String {
         self.path.clone()
     }
 
-    /// Given the starting path and the depth, this function will fill up a file tree traversing upto
-    /// the requested depth. This function is mutable in nature.
-    /// 
-    /// Arguments: 
-    /// `depth` - The depth until which the recursive tree will search into,
-    /// `path` - The path to start searching from
-    /// 
-    /// ```
-    /// let tree = Tree::new();
-    /// tree.fill(2, ".");
-    /// ```
     pub fn quick_fill(&mut self, depth: u8, path: String, args: &Arguments, results: &mut Results) {
-        // base case
         if depth == 0 {
-            return
+            return;
         }
 
-        // return if the path is a file or a syslink or let's say, is not a directory
-        let metadata: Result<Metadata> = fs::metadata(&path);
-        if metadata.is_err() { return; }
-        if !metadata.unwrap().is_dir() { 
-            return; 
+        match fs::metadata(&path) {
+            Ok(x) => if !x.is_dir() { return; },
+            _ => return,
         }
 
-        // loop over the contents of the directory
-        let dir_entries: Result<ReadDir> = fs::read_dir(path);
-        if dir_entries.is_err() { return; }
+        let entries: Vec<DirEntry> = {
+            match fs::read_dir(path) {
+                Ok(x) => x,
+                _ => return,
+            }
+        }.flatten().collect();
 
-        // entries are stored in a Vector after flattening it
-        let mut entries: Vec<DirEntry> = Vec::new();
-        for entry in dir_entries.unwrap() {
-            if entry.is_err() { continue; }
-            entries.push(entry.unwrap());
-        }
-
-        // ignore list is created with all mentioned files and dirs
         let ignorelist = [".ignore", ".gitignore"];
         let mut ignore: Vec<String> = Vec::new();
-        if let Some(entry) = entries.iter()
-        .find(|x| ignorelist.contains(&x.file_name().to_str().unwrap())) {
-
-            // read each line in an ignore file and push to ignore after trimming it
+        if let Some(entry) = entries
+            .iter()
+            .find(|x| ignorelist.contains(&x.file_name().to_str().unwrap()))
+        {
+            let separators: &[_] = &['\\', '/'];
             for line in fs::read_to_string(entry.path()).unwrap().lines() {
-                let separators: &[_] = &['\\', '/'];
                 ignore.push(line.to_owned().trim_matches(separators).to_owned());
             }
         }
 
         for entry in entries {
-            // the path to the entry
-            let entry_path: String = entry.path().to_str()
-                .expect("Invalid Path")
-                .to_string();
+            let pathname: String = match entry.path().to_str() {
+                Some(x) => x.to_string(),
+                None => continue,
+            };
 
-            // the path to the file name
-            let entry_file: String = entry.file_name().to_str()
-                .expect("Invalid File Name")
-                .to_string();
-
-            // Return if the hidden flag is off and the entry name starts with "." 
-            if !args.all {
-                if entry_file.starts_with(".") { continue; } 
-            }
-
-            // if the entry is mentioned in the specified ignore list, ignore it OwO
-            if ignore.contains(&entry_file.to_owned()).to_owned() 
-                && args.useignore { continue; }
-            
-            // make a new tree 
-            let mut tree: Tree = Tree::new();
-            tree.path = entry_path.clone();
-
-            if fs::metadata(&entry_path).is_ok() {
-                let metadata = fs::metadata(&entry_path).unwrap();
-                results.metadata.push(metadata.clone());
+            let filename: String = match entry.file_name().to_str() {
+                Some(x) => x.to_string(),
+                None => continue,
+            };
                 
-                if metadata.is_dir() {
+            if (!args.all && filename.starts_with(".")) || 
+            (args.useignore && ignore.contains(&filename))
+            {
+                continue;
+            }
+            
+            let mut entry = Entry::new(&pathname);
+            let metadata = fs::metadata(&pathname);
+            if metadata.is_ok() {
+                entry.set_metadata(&metadata.unwrap());
+
+                if entry.is_dir() {
                     results.add_foldercount();
                 } else {
                     results.add_filecount();
                 }
-            }                
-
-            if entry_file.contains(&args.pattern) {
-                results.pathlist.push(entry_path.clone());
-            } else if fs::metadata(&entry_path).is_ok() {
-                results.metadata.pop();
             }
+            
+            if filename.contains(&args.pattern) {
+                results.push(entry);
+            }
+            
+            let mut tree: Tree = Tree::new(&pathname);
+            tree.quick_fill(depth - 1, pathname, args, results);
 
-            // go inside this entry directory(if), then rinse and repeat
-            tree.quick_fill(depth - 1, entry_path, args, results);
             self.children.push(tree);
         }
     }
-    
-    /// Check if the pattern exists inside the contents of a file,
-    /// given that the file is not a binary file
-    pub fn infile(&mut self, depth: u8, path: String, args: &Arguments, results: &mut Results) {
-        // return if the path is a file or a syslink or let's say, is not a directory
-        let metadata: Result<Metadata> = fs::metadata(&path);
-        if metadata.is_err() { return; }
-        if metadata.as_ref().unwrap().is_file() { 
-            let mut file: File = match fs::File::open(&path) {Ok(x) => x, _ => return };
-                
-            // inspect the file to check if its a binary file >:( 
-            let mut buffer = [0; 1024];
-            match file.read(&mut buffer) {Ok(_) => {}, _ => return};
-            if content_inspector::inspect(&buffer[..]).is_binary() { return; }
-            
-            // read the file to a string
-            let content: String = match fs::read_to_string(&path) {Ok(x) => x, _ => return };
-            
-            // does it even contain the pattern?
-            if !content.contains(&args.pattern) { return; }
-            
-            /* Here, the real magic happens:
-            *  - Lines are being counted and 
-            *  - Characters before the pattern in each line are being counted
-            */
-            for (linecount, result) in content.lines().enumerate() {
-                if !result.contains(&args.pattern) { continue; }
-                
-                let splitted_result: Vec<&str> = result.split(&args.pattern).collect();
-                let mut last = 0;
-                for takeout in splitted_result.iter().take(splitted_result.len() - 1) {
-                    last += takeout.len();
-                    results.pathlist.push(format!(
-                        "{}:{}:{}", path, last, linecount
-                    ));
 
-                    results.metadata
-                        .push(metadata.as_ref()
-                        .unwrap().clone());
+    pub fn search_infile(&mut self, depth: u8, path: String, args: &Arguments, results: &mut Results) {
+        let metadata: Metadata = {
+            match fs::metadata(&path) {
+                Ok(x) => x, 
+                _ => return
+            }
+        };
+
+        if metadata.is_file() {
+            let mut buffer: [u8; 1024] = [0; 1024];
+            if let Ok(x) = fs::File::open(&path).as_mut() {
+                if x.read(&mut buffer).is_err() {
+                    return;
+                }
+            } else { return; }
+
+            if content_inspector::inspect(&buffer[..]).is_binary() {
+                return;
+            }
+
+            let content: String = {
+                if let Ok(x) = fs::read_to_string(&path) {
+                    if x.contains(&args.pattern) { x } else { return; }
+                } else { return; }
+            };
+
+            for (linecount, result) in content.lines().enumerate() {
+                if !result.contains(&args.pattern) { 
+                    continue; 
+                }
+
+                let splitted_result: Vec<&str> = result.split(&args.pattern).collect();
+                let mut colcount = 0;
+                for chunk in splitted_result.iter().take(splitted_result.len() - 1) {
+                    colcount += chunk.len();
+                    let mut entry = Entry::new(
+                        &format!("{}:{}:{}", path, linecount + 1, colcount)
+                    );
+                    entry.set_metadata(&metadata);
+                    results.push(entry);
                 }
             }
-            
+
             return;
         }
-        
-        // base case
+
         if depth == 0 {
             return;
         }
 
-        // loop over the contents of the directory
-        let dir_entries: Result<ReadDir> = fs::read_dir(&path);
-        if dir_entries.is_err() { return; }
-        
-        // entries are stored in a Vector after flattening it
-        let mut entries: Vec<DirEntry> = Vec::new();
-        for entry in dir_entries.unwrap() {
-            if entry.is_err() { continue; }
-            entries.push(entry.unwrap());
-        }
+        let entries: Vec<DirEntry> = {
+            match fs::read_dir(&path) {
+                Ok(x) => x,
+                _ => return
+            }
+        }.flatten().collect();
 
-        // ignore list is created with all mentioned files and dirs
         let ignorelist = [".ignore", ".gitignore"];
         let mut ignore: Vec<String> = Vec::new();
-        if let Some(entry) = entries.iter()
-        .find(|x| ignorelist.contains(&x.file_name().to_str().unwrap())) {
-
-            // read each line in an ignore file and push to ignore after trimming it
+        if let Some(entry) = entries
+            .iter()
+            .find(|x| ignorelist.contains(&x.file_name().to_str().unwrap()))
+        {
+            let separators: &[_] = &['\\', '/'];
             for line in fs::read_to_string(entry.path()).unwrap().lines() {
-                let separators: &[_] = &['\\', '/'];
                 ignore.push(line.to_owned().trim_matches(separators).to_owned());
             }
         }
-        
+
         for entry in entries {
-            // the path to the entry
-            let entry_path: String = entry.path().to_str()
-            .expect("Invalid Path")
-            .to_string();
-        
-        // the path to the file name
-            let entry_file: String = entry.file_name().to_str()
-                .expect("Invalid File Name")
-                .to_string();
-            
-            // Return if the hidden flag is off and the entry name starts with "." 
-            if !args.all {
-                if entry_file.starts_with(".") { continue; } 
+            let entry_path: String = match entry.path().to_str() {
+                Some(x) => x,
+                _ => continue
+            }.to_string();
+
+            let entry_file: String = match entry.file_name().to_str() {
+                Some(x) => x,
+                _ => continue
+            }.to_string();
+
+            if (!args.all && entry_file.starts_with("."))
+            || (ignore.contains(&entry_file) && args.useignore) {
+                continue;
             }
-            
-            // if the entry is mentioned in the specified ignore list, ignore it OwO
-            if ignore.contains(&entry_file.to_owned()).to_owned() 
-            && args.useignore { continue; }
-            
+
             if fs::metadata(&entry_path).is_ok() {
                 if fs::metadata(&entry_path).unwrap().is_dir() {
                     results.add_foldercount();
@@ -220,7 +182,7 @@ impl Tree {
                 }
             }
 
-            self.infile(depth - 1, entry_path, args, results);
+            self.search_infile(depth - 1, entry_path, args, results);
         }
     }
 }

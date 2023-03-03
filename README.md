@@ -22,6 +22,7 @@ cargo build
 cp target/debug/srch ~/.local/bin/
 ```
 
+>Note for Windows users: `cmd` does not support colors. Consider using powershell instead.
 
 # Basic Usage
 
