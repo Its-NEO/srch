@@ -9,7 +9,6 @@ use tree::Tree;
 
 #[derive(Parser)]
 #[command(name = "srch")]
-#[command(author = "Rakib M. <rakibmondal2155@gmail.com>")]
 #[command(version = "1.0")]
 #[command(about = "A feature-rich search tool to find all you want.")]
 pub struct Arguments {
@@ -36,10 +35,6 @@ pub struct Arguments {
     /// Display file information along with the path
     #[arg(short, long)]
     verbose: bool,
-
-    /// Searches inside binary files (Skips large files) <Under construction>
-    #[arg(short, long, requires = "internal")]
-    binary: bool,
 }
 
 fn main() -> Result<()> {

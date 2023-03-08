@@ -1,5 +1,5 @@
 # srch
-A crossplatform search utility written for you who craves simplicity.
+A search utility written for you who craves simplicity.
 
 # Install
 ### Required:
@@ -21,8 +21,6 @@ cargo build
 ```bash
 cp target/debug/srch ~/.local/bin/
 ```
-
->Note for Windows users: `cmd` does not support colors. Consider using powershell instead.
 
 # Basic Usage
 

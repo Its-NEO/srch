@@ -37,6 +37,7 @@ impl Tree {
             }
         }.flatten().collect();
 
+        // only cares about immediate ignore folders... fix needed
         let ignorelist = [".ignore", ".gitignore"];
         let mut ignore: Vec<String> = Vec::new();
         if let Some(entry) = entries
@@ -65,18 +66,13 @@ impl Tree {
             {
                 continue;
             }
-            
-            let mut entry = Entry::new(&pathname);
-            let metadata = fs::metadata(&pathname);
-            if metadata.is_ok() {
-                entry.set_metadata(&metadata.unwrap());
 
+            let entry = Entry::new(&pathname);
                 if entry.is_dir() {
                     results.add_foldercount();
                 } else {
                     results.add_filecount();
                 }
-            }
             
             if filename.contains(&args.pattern) {
                 results.push(entry);
@@ -124,10 +120,9 @@ impl Tree {
                 let mut colcount = 0;
                 for chunk in splitted_result.iter().take(splitted_result.len() - 1) {
                     colcount += chunk.len();
-                    let mut entry = Entry::new(
+                    let entry = Entry::new(
                         &format!("{}:{}:{}", path, linecount + 1, colcount)
                     );
-                    entry.set_metadata(&metadata);
                     results.push(entry);
                 }
             }
@@ -146,6 +141,7 @@ impl Tree {
             }
         }.flatten().collect();
 
+        // only cares about immediate ignore folders... fix needed
         let ignorelist = [".ignore", ".gitignore"];
         let mut ignore: Vec<String> = Vec::new();
         if let Some(entry) = entries
@@ -174,12 +170,10 @@ impl Tree {
                 continue;
             }
 
-            if fs::metadata(&entry_path).is_ok() {
-                if fs::metadata(&entry_path).unwrap().is_dir() {
-                    results.add_foldercount();
-                } else {
-                    results.add_filecount();
-                }
+            if fs::metadata(&entry_path).unwrap().is_dir() {
+                results.add_foldercount();
+            } else {
+                results.add_filecount();
             }
 
             self.search_infile(depth - 1, entry_path, args, results);

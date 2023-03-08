@@ -62,9 +62,11 @@ pub struct Entry {
 
 impl Entry {
     pub fn new(path: &String) -> Self {
-        let metadata = PathBuf::from(path)
-            .metadata()
-            .expect("Valid metadata expected");
+        let metadata = PathBuf::from(
+            if path.contains(":") {
+                path.split(":").next().unwrap()
+            } else { path }
+        ).metadata().expect("Valid metadata expected");
 
         Self {
             path: path.clone(),
@@ -74,10 +76,6 @@ impl Entry {
 
     pub fn is_dir(&self) -> bool {
         self.metadata.is_dir()
-    }
-
-    pub fn set_metadata(&mut self, metadata: &Metadata) {
-        self.metadata = metadata.clone();
     }
 }
 
