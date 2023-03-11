@@ -21,7 +21,7 @@ pub struct Arguments {
     depth: u8,
 
     /// Search through text-based file's contents
-    #[arg(short = 'f', long, group = "internal")]
+    #[arg(short = 'f', long)]
     infile: bool,
 
     /// Search through hidden folders
@@ -35,6 +35,14 @@ pub struct Arguments {
     /// Display file information along with the path
     #[arg(short, long)]
     verbose: bool,
+
+    /// Only view the paths
+    #[arg(short, long)]
+    pathonly: bool,
+
+    /// Get a single result
+    #[arg(short, long)]
+    get: Option<usize>,
 }
 
 fn main() -> Result<()> {
@@ -52,8 +60,24 @@ fn main() -> Result<()> {
     } else {
         tree.quick_fill(args.depth, tree.path(), &args, &mut results);
     }
-    
-    results.write(&mut buf_writer, args.verbose)?;
+
+    if let Some(x) = args.get {
+        let entry = match results.entries.get(x) {
+            Some(e) => e,
+            None => panic!("Entry index out of bounds"),
+        }
+        .to_owned();
+
+        results.entries = Vec::new();
+        results.entries.push(entry);
+    }
+
+    results.write(&mut buf_writer, &args)?;
+    if args.pathonly {
+        buf_writer.flush()?;
+        return Ok(());
+    }
+
     let duration = instant.elapsed();
 
     writeln!(

@@ -4,8 +4,10 @@ use std::io::{self, BufWriter, Stdout, Write};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+use crate::Arguments;
+
 pub struct Results {
-    entries: Vec<Entry>,
+    pub entries: Vec<Entry>,
     filecount: usize,
     foldercount: usize,
 }
@@ -43,10 +45,19 @@ impl Results {
         &self.entries
     }
 
-    pub fn write(&self, buf_writer: &mut BufWriter<Stdout>, verbose: bool) -> io::Result<()> {
+    pub fn write(&self, buf_writer: &mut BufWriter<Stdout>, args: &Arguments) -> io::Result<()> {
         for (index, entry) in self.entries.iter().enumerate() {
+            if args.pathonly {
+                if entry.path.contains(":") {
+                    writeln!(buf_writer, "{}", entry.path.split(":").next().unwrap())?;
+                } else {
+                    writeln!(buf_writer, "{}", entry.path)?;
+                }
+                continue;
+            }
+
             writeln!(buf_writer, "{}", entry.path)?;
-            if verbose {
+            if args.verbose {
                 write_metadata(&entry.metadata, buf_writer, index == self.entries.len() - 1)?;
             }
         }
@@ -55,6 +66,7 @@ impl Results {
     }
 }
 
+#[derive(Clone)]
 pub struct Entry {
     path: String,
     metadata: Metadata,
@@ -62,11 +74,13 @@ pub struct Entry {
 
 impl Entry {
     pub fn new(path: &String) -> Self {
-        let metadata = PathBuf::from(
-            if path.contains(":") {
-                path.split(":").next().unwrap()
-            } else { path }
-        ).metadata().expect("Valid metadata expected");
+        let metadata = PathBuf::from(if path.contains(":") {
+            path.split(":").next().unwrap()
+        } else {
+            path
+        })
+        .metadata()
+        .expect("Valid metadata expected");
 
         Self {
             path: path.clone(),
@@ -110,30 +124,15 @@ fn write_metadata(
         "_".to_string()
     };
 
-    writeln!(
-        buf_writer,
-        "{:<15} {}",
-        "Created:",
-        created,
-    )?;
+    writeln!(buf_writer, "{:<15} {}", "Created:", created,)?;
 
-    writeln!(
-        buf_writer,
-        "{:<15} {}",
-        "Last modified:",
-        last_modified,
-    )?;
+    writeln!(buf_writer, "{:<15} {}", "Last modified:", last_modified,)?;
 
     let file_type = metadata.file_type();
     let perm = metadata.permissions();
 
     if file_type.is_file() {
-        writeln!(
-            buf_writer, 
-            "{:<15} {}", 
-            "File type:", 
-            "file",
-        )?;
+        writeln!(buf_writer, "{:<15} {}", "File type:", "file",)?;
 
         if metadata.len() > 1024 * 1024 * 1024 {
             writeln!(
@@ -158,12 +157,7 @@ fn write_metadata(
             )?;
         }
     } else {
-        writeln!(
-            buf_writer, 
-            "{:<15} {}", 
-            "File type:", 
-            "dir",
-        )?;
+        writeln!(buf_writer, "{:<15} {}", "File type:", "dir",)?;
     }
 
     writeln!(

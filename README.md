@@ -1,5 +1,5 @@
 # srch
-A search utility written for you who craves simplicity.
+A crossplatform search utility written for you who craves simplicity.
 
 # Install
 ### Required:
