@@ -57,8 +57,11 @@ impl Results {
             }
 
             writeln!(buf_writer, "{}", entry.path)?;
+
             if args.verbose {
-                write_metadata(&entry.metadata, buf_writer, index == self.entries.len() - 1)?;
+                if let Some(x) = &entry.metadata {
+                    write_metadata(x, buf_writer, index == self.entries.len() - 1)?;
+                }
             }
         }
 
@@ -69,7 +72,7 @@ impl Results {
 #[derive(Clone)]
 pub struct Entry {
     path: String,
-    metadata: Metadata,
+    metadata: Option<Metadata>,
 }
 
 impl Entry {
@@ -79,17 +82,25 @@ impl Entry {
         } else {
             path
         })
-        .metadata()
-        .expect("Valid metadata expected");
+        .metadata();
+
+        if metadata.is_err() {
+            return Self {
+                path: path.clone(),
+                metadata: None
+            }
+        }
 
         Self {
             path: path.clone(),
-            metadata,
+            metadata: Some(metadata.unwrap()),
         }
     }
 
     pub fn is_dir(&self) -> bool {
-        self.metadata.is_dir()
+        if let Some(x) = &self.metadata {
+            return x.is_dir()
+        } else { false }
     }
 }
 

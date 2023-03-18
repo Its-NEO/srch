@@ -78,6 +78,8 @@ impl Tree {
                 continue;
             }
 
+            if fs::metadata(&pathname).is_err() { continue; }
+
             let entry = Entry::new(&pathname);
             if entry.is_dir() {
                 results.add_foldercount();
