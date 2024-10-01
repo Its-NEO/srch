@@ -2,6 +2,7 @@ use crate::results::Entry;
 use crate::{results::Results, Arguments};
 use std::fs::{self, DirEntry, Metadata};
 use std::io::Read;
+use std::collections::VecDeque;
 
 pub struct Tree {
     path: String,
@@ -97,7 +98,6 @@ impl Tree {
             self.children.push(tree);
         }
     }
-
     pub fn get_infile_results(path: &String, pattern: &String, results: &mut Results) {
         let content: String = {
             if let Ok(x) = fs::read_to_string(&path) {

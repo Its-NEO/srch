@@ -11,6 +11,7 @@ use tree::Tree;
 #[command(name = "srch")]
 #[command(version = "1.0")]
 #[command(about = "A feature-rich search tool to find all you want.")]
+#[derive(Clone)]
 pub struct Arguments {
     /// The pattern you want to search for
     #[arg()]
@@ -39,21 +40,16 @@ pub struct Arguments {
     /// Only view the paths
     #[arg(short, long)]
     pathonly: bool,
-
-    /// Get a single result
-    #[arg(short, long)]
-    get: Option<usize>,
 }
 
 fn main() -> Result<()> {
     let instant = Instant::now();
-
     let args: Arguments = Arguments::parse();
     let mut tree: Tree = Tree::new(&".".to_string());
-    let mut results: Results = Results::new();
 
     let stdout: Stdout = io::stdout();
-    let mut buf_writer: BufWriter<Stdout> = io::BufWriter::new(stdout);
+    let buf_writer: BufWriter<Stdout> = io::BufWriter::new(stdout);
+    let mut results: Results = Results::new(buf_writer, args.clone());
 
     if args.infile {
         tree.search_infile(args.depth, tree.path(), &args, &mut results);
@@ -61,34 +57,22 @@ fn main() -> Result<()> {
         tree.quick_fill(args.depth, tree.path(), &args, &mut results);
     }
 
-    if let Some(x) = args.get {
-        let entry = match results.entries.get(x) {
-            Some(e) => e,
-            None => panic!("Entry index out of bounds"),
-        }
-        .to_owned();
-
-        results.entries = Vec::new();
-        results.entries.push(entry);
-    }
-
-    results.write(&mut buf_writer, &args)?;
-    if args.pathonly {
-        buf_writer.flush()?;
-        return Ok(());
-    }
-
     let duration = instant.elapsed();
+    let entries_len = results.get_entries().len();
+    let filecount = results.get_filecount();
+    let foldercount = results.get_foldercount();
+    let duration_ms = duration.as_millis();
 
-    writeln!(
-        buf_writer,
-        "\nFound {} results.\nSearched through {} file(s) and {} folder(s) in {} ms.",
-        format!("{}", results.get_entries().len()),
-        format!("{}", results.get_filecount()),
-        format!("{}", results.get_foldercount()),
-        format!("{}", duration.as_millis()),
-    )?;
+    if !args.pathonly {
+        writeln!(
+            &mut results.writer,
+            "\nFound {} results.\nSearched through {} file(s) and {} folder(s) in {} ms.",
+            format!("{}", entries_len),
+            format!("{}", filecount),
+            format!("{}", foldercount),
+            format!("{}", duration_ms),
+        )?;
+    }
 
-    buf_writer.flush()?;
     Ok(())
 }
