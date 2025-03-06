@@ -83,10 +83,10 @@ fn main() -> Result<()> {
     writeln!(
         buf_writer,
         "\nFound {} results.\nSearched through {} file(s) and {} folder(s) in {} ms.",
-        format!("{}", results.get_entries().len()),
-        format!("{}", results.get_filecount()),
-        format!("{}", results.get_foldercount()),
-        format!("{}", duration.as_millis()),
+        format_args!("{}", results.get_entries().len()),
+        format_args!("{}", results.get_filecount()),
+        format_args!("{}", results.get_foldercount()),
+        format_args!("{}", duration.as_millis()),
     )?;
 
     buf_writer.flush()?;

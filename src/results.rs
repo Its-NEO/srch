@@ -98,9 +98,7 @@ impl Entry {
     }
 
     pub fn is_dir(&self) -> bool {
-        if let Some(x) = &self.metadata {
-            return x.is_dir()
-        } else { false }
+        self.metadata.clone().is_some_and(|x| x.is_dir())
     }
 }
 
@@ -143,39 +141,39 @@ fn write_metadata(
     let perm = metadata.permissions();
 
     if file_type.is_file() {
-        writeln!(buf_writer, "{:<15} {}", "File type:", "file",)?;
+        writeln!(buf_writer, "{:<15} file", "File type:")?;
 
         if metadata.len() > 1024 * 1024 * 1024 {
             writeln!(
                 buf_writer,
                 "{:<15} {}",
                 "File size:",
-                format!("{}GB", metadata.len() / (1024 * 1024 * 1024)),
+                format_args!("{}GB", metadata.len() / (1024 * 1024 * 1024)),
             )?;
         } else if metadata.len() > 1024 * 1024 {
             writeln!(
                 buf_writer,
                 "{:<15} {}",
                 "File size:",
-                format!("{}MB", metadata.len() / (1024 * 1024)),
+                format_args!("{}MB", metadata.len() / (1024 * 1024)),
             )?;
         } else {
             writeln!(
                 buf_writer,
                 "{:<15} {}",
                 "File size:",
-                format!("{}KB", metadata.len() / 1024),
+                format_args!("{}KB", metadata.len() / 1024),
             )?;
         }
     } else {
-        writeln!(buf_writer, "{:<15} {}", "File type:", "dir",)?;
+        writeln!(buf_writer, "{:<15} dir", "File type:")?;
     }
 
     writeln!(
         buf_writer,
         "{:<15} {}",
         "Permissions:",
-        format!("{}", if perm.readonly() { "read only" } else { "all" }),
+        format_args!("{}", if perm.readonly() { "read only" } else { "all" }),
     )?;
 
     if !last {

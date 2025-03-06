@@ -9,9 +9,9 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new(path: &String) -> Tree {
+    pub fn new(path: &str) -> Tree {
         Tree {
-            path: path.clone(),
+            path: path.to_string(),
             children: Vec::new(),
         }
     }
@@ -20,7 +20,7 @@ impl Tree {
         self.path.clone()
     }
 
-    pub fn read_ignorefile(entries: &Vec<DirEntry>) -> Vec<String> {
+    pub fn read_ignorefile(entries: &[DirEntry]) -> Vec<String> {
         let ignorelist = [".ignore", ".gitignore"];
         let mut ignore: Vec<String> = Vec::new();
         if let Some(entry) = entries
@@ -100,7 +100,7 @@ impl Tree {
 
     pub fn get_infile_results(path: &String, pattern: &String, results: &mut Results) {
         let content: String = {
-            if let Ok(x) = fs::read_to_string(&path) {
+            if let Ok(x) = fs::read_to_string(path) {
                 if x.contains(pattern) {
                     x
                 } else {
@@ -128,7 +128,7 @@ impl Tree {
 
     pub fn is_file_binary(path: &String) -> bool {
         let mut buffer: [u8; 1024] = [0; 1024];
-        if let Ok(x) = fs::File::open(&path).as_mut() {
+        if let Ok(x) = fs::File::open(path).as_mut() {
             if x.read(&mut buffer).is_err() {
                 return false;
             }
@@ -139,6 +139,7 @@ impl Tree {
         content_inspector::inspect(&buffer[..]).is_binary()
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     pub fn search_infile(
         &mut self,
         depth: u8,
